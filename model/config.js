@@ -14,9 +14,10 @@ onlyGroup: false
 # 命中的命令不挂按钮，例：["抽卡|十连|百连"]
 exclude: []
 
-# split：图片单独发、按钮单独发（手机上也能看清图）
-# merge：图片转 markdown 和按钮挤在同一条（手机端可能显示成 [图片]）
-imageMode: split
+# auto  ：桥打上图片补丁时同一条（图+按钮），没打时分两条
+# split ：图片单独发、按钮单独发（手机上也能看清图）
+# merge ：图片转 markdown 和按钮挤在同一条
+imageMode: auto
 
 # 回复文字里出现 #命令 时，自动把它加成按钮
 autoFromText: true
@@ -94,7 +95,7 @@ function normalize(raw) {
   return {
     enable: raw?.enable !== false,
     onlyGroup: raw?.onlyGroup === true,
-    imageMode: raw?.imageMode === 'merge' ? 'merge' : 'split',
+    imageMode: ['merge', 'split'].includes(raw?.imageMode) ? raw.imageMode : 'auto',
     autoFromText: raw?.autoFromText !== false,
     maxAuto: Math.min(Math.max(Number(raw?.maxAuto) || 3, 1), 5),
     exclude: (Array.isArray(raw?.exclude) ? raw.exclude : []).map(toRe).filter(Boolean),

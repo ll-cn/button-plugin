@@ -1,6 +1,7 @@
 import { getConfig } from '../model/config.js'
 import { rowsFromStrings, buildRows, commandsInText, labelOf } from '../model/rows.js'
 import { pickEntries } from '../model/help.js'
+import { resolveImageMode } from '../model/bridge.js'
 
 const MARK = Symbol('btnDecorated')
 const PASSTHROUGH = new Set(['record', 'video', 'forward', 'node', 'button'])
@@ -103,7 +104,7 @@ function plan(cfg, msg, fixed) {
   }
   rows = appendAuto(cfg, rows, textOf(msg))
   if (!rows || !rows.length) return null
-  return { rows, split: cfg.imageMode === 'split' }
+  return { rows, split: resolveImageMode(cfg.imageMode) === 'split' }
 }
 
 function patch(holder, key, fixed) {

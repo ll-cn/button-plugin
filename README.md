@@ -32,6 +32,22 @@ git clone https://github.com/ll-cn/button-plugin.git plugins/button-plugin
 - 按钮的 `data` 就是命令文本。点击后 QQ 把它当作一条普通消息送进来，
   规则管道照常执行，所以回复里还会再挂一次按钮，可以一直点下去。
 
+## 手机上看不到图片？给桥打一行补丁
+
+「图 + 按钮」合成一条只能靠 QQ 的 markdown 消息。桥接层（`alemonjs-load-yunzai`）把图片写成
+`![图片](qqbot-media://…)`，**没带尺寸标注**，安卓端就不会按图片解析，只显示 `[图片]`；电脑端能显示但会被压成一条。
+官方语法要求写成 `![文字 #宽px #高px](url)`（`#0 #0` 表示自动缩放）。
+
+在 alemon 根目录执行一次（自带备份、可重复执行）：
+
+```bash
+node plugins/button-plugin/scripts/patch-bridge.mjs          # 打补丁
+node plugins/button-plugin/scripts/patch-bridge.mjs --revert # 出问题时还原
+```
+
+重启机器人后，`#按钮状态` 里会显示「桥图片补丁：已打」，插件随即自动切到 `merge`（图与按钮同一条）。
+没打补丁时自动用 `split`，图与按钮分两条发。
+
 ## 配置
 
 首次运行会生成 `config/config.yaml`（不进 git）。改完存盘即生效。
@@ -40,7 +56,7 @@ git clone https://github.com/ll-cn/button-plugin.git plugins/button-plugin
 enable: true           # 总开关
 onlyGroup: false       # 只在群聊生效
 exclude: []            # 命中的命令不挂按钮，例：["抽卡|十连"]
-imageMode: split       # split：图与按钮分两条；merge：图转 markdown 和按钮挤一条
+imageMode: auto        # auto 按桥补丁自动选；也可写死 split / merge
 autoFromText: true     # 回复文字里出现 #命令 时自动把它加成按钮
 maxAuto: 3             # 自动按钮最多几个
 danger: "^#?(删除|解绑|清除|重置)"   # 命中的按钮变成指令按钮（点了只填入输入框）
@@ -81,3 +97,4 @@ panels:                # 专门面板：match 命中时替换默认键盘
 
 - `0.0.1` 首个版本：装饰器挂按钮、帮助面板、更新命令
 - `0.0.2` 图片与按钮改成分两条发（手机端能看到图了）；回复里出现的 `#命令` 自动变成按钮
+- `0.0.3` 配 `scripts/patch-bridge.mjs` 修桥层的 markdown 图片尺寸，打上补丁后可回到「图 + 按钮」同一条

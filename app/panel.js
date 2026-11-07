@@ -4,6 +4,7 @@ import { rowsFromStrings, buildRows } from '../model/rows.js'
 import { pickEntries, miaoCount, loadMiaoCommands } from '../model/help.js'
 import { PLUGIN_NAME, VERSION, versionLine } from '../model/version.js'
 import { updatePlugin, replyChangelog } from '../model/update.js'
+import { bridgePatched, resolveImageMode } from '../model/bridge.js'
 
 export default class ButtonPanel extends plugin {
   constructor() {
@@ -42,7 +43,8 @@ export default class ButtonPanel extends plugin {
       `${PLUGIN_NAME} v${VERSION}`,
       `总开关：${cfg.enable ? '开' : '关'}`,
       `默认键盘：${cfg.default.enable ? `${cfg.default.rows.length} 行` : '关'}`,
-      `图片模式：${cfg.imageMode}（split=图与按钮分开发）`,
+      `图片模式：${resolveImageMode(cfg.imageMode)}（配置 ${cfg.imageMode}）`,
+      `桥图片补丁：${bridgePatched() === true ? '已打' : bridgePatched() === false ? '未打' : '未找到桥文件'}`,
       `文字转按钮：${cfg.autoFromText ? `开，最多 ${cfg.maxAuto} 个` : '关'}`,,
       `专门面板：${cfg.panels.length} 个`,
       `面板匹配：${match}`,
