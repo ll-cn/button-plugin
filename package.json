@@ -1,0 +1,13 @@
+{
+  "name": "button-plugin",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "index.js",
+  "description": "给云崽已有命令的回复挂按钮，点一下直接执行",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ll-cn/button-plugin.git"
+  },
+  "keywords": ["yunzai", "qq-bot", "button", "keyboard"],
+  "author": "ll-cn"
+}
