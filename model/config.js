@@ -26,6 +26,11 @@ maxAuto: 3
 # 危险命令用指令按钮：点了只填入输入框，需自己发送
 danger: "^#?(删除|解绑|清除|重置)"
 
+# 其它插件写好的指令按钮改成回调，点一下直接执行
+upgradeButtons: true
+# 这些命令保留指令按钮，需要用户自己补参数
+keepInput: "^[#*]?(删除|解绑|绑定|登录|扫码|切换|设置|导入|添加|修改|清除|重置)"
+
 # 没有专门面板时，给带图的回复挂这套
 default:
   enable: true
@@ -99,6 +104,8 @@ function normalize(raw) {
     autoFromText: raw?.autoFromText !== false,
     maxAuto: Math.min(Math.max(Number(raw?.maxAuto) || 3, 1), 5),
     exclude: (Array.isArray(raw?.exclude) ? raw.exclude : []).map(toRe).filter(Boolean),
+    upgradeButtons: raw?.upgradeButtons !== false,
+    keepInput: toRe(raw?.keepInput) ?? toRe('^[#*]?(删除|解绑|绑定|登录|扫码|切换|设置|导入|添加|修改|清除|重置)'),
     danger: toRe(raw?.danger) ?? toRe('^#?(删除|解绑|清除|重置)'),
     default: { enable: def.enable !== false, rows: toRows(def.rows) },
     panels

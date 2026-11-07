@@ -6,9 +6,45 @@ import { resolveImageMode } from '../model/bridge.js'
 const MARK = Symbol('btnDecorated')
 const PASSTHROUGH = new Set(['record', 'video', 'forward', 'node', 'button'])
 const MAX_ROWS = 5
+const CALL_TYPES = new Set([0, 'call'])
 
 function isImage(item) {
   return item?.type === 'image' || item?.type === 'flash' || Buffer.isBuffer(item)
+}
+
+/** 是否像一个按钮定义 */
+function isButtonNode(node) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return false
+  const hasLabel = node.title !== undefined || node.label !== undefined || node.text !== undefined || node.value !== undefined
+  const hasAction = node.data !== undefined || node.action !== undefined || node.callback !== undefined || node.link !== undefined || node.options !== undefined
+  return hasLabel && hasAction
+}
+
+/** 把指令按钮改写成回调按钮，需要用户补参数的原样保留 */
+function rewriteNode(node, keepInput) {
+  if (Array.isArray(node)) return node.map((item) => rewriteNode(item, keepInput))
+  if (node && typeof node === 'object' && Array.isArray(node.buttons)) {
+    return { ...node, buttons: node.buttons.map((item) => rewriteNode(item, keepInput)) }
+  }
+  if (!isButtonNode(node)) return node
+
+  const type = node.type ?? node.action?.type
+  if (CALL_TYPES.has(type) || type === 1 || type === 'link' || node.link !== undefined) return node
+
+  const data = String(node.data ?? node.action?.data ?? node.options?.data ?? node.callback ?? '')
+  if (!data || /^https?:\/\//i.test(data) || keepInput.test(data)) return node
+  return { ...node, data, type: 'call' }
+}
+
+/** 升级消息里其它插件写好的按钮 */
+function upgradeButtons(msg, cfg) {
+  if (!cfg.upgradeButtons) return msg
+  if (Array.isArray(msg)) {
+    if (!msg.some((seg) => seg?.type === 'button')) return msg
+    return msg.map((seg) => (seg?.type === 'button' ? { ...seg, data: rewriteNode(seg.data, cfg.keepInput) } : seg))
+  }
+  if (msg?.type === 'button') return { ...msg, data: rewriteNode(msg.data, cfg.keepInput) }
+  return msg
 }
 
 /** 消息里是否含图片 */
@@ -110,15 +146,25 @@ function plan(cfg, msg, fixed) {
 function patch(holder, key, fixed) {
   const orig = holder?.[key]
   if (typeof orig !== 'function' || orig[MARK]) return
+  let splitUsed = 0
   const wrapped = async function (msg, quote) {
+    const cfg = getConfig()
+    let next = msg
+    try {
+      next = upgradeButtons(msg, cfg)
+    } catch {}
+
     let planned = null
     try {
-      planned = plan(getConfig(), msg, fixed)
+      planned = plan(cfg, next, fixed)
     } catch {}
-    if (!planned) return orig.call(this, msg, quote)
+    if (!planned) return orig.call(this, next, quote)
 
-    const part = planned.split ? splitImage(msg) : null
-    if (!part) return orig.call(this, attach(msg, planned.rows), quote)
+    if (planned.split && splitUsed > 0) return orig.call(this, next, quote)
+    if (planned.split) splitUsed++
+
+    const part = planned.split ? splitImage(next) : null
+    if (!part) return orig.call(this, attach(next, planned.rows), quote)
 
     let first = null
     try {
