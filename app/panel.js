@@ -42,6 +42,8 @@ export default class ButtonPanel extends plugin {
       `${PLUGIN_NAME} v${VERSION}`,
       `总开关：${cfg.enable ? '开' : '关'}`,
       `默认键盘：${cfg.default.enable ? `${cfg.default.rows.length} 行` : '关'}`,
+      `图片模式：${cfg.imageMode}（split=图与按钮分开发）`,
+      `文字转按钮：${cfg.autoFromText ? `开，最多 ${cfg.maxAuto} 个` : '关'}`,,
       `专门面板：${cfg.panels.length} 个`,
       `面板匹配：${match}`,
       `miao 帮助条目：${miaoCount()}`,

@@ -32,3 +32,15 @@ export function buildRows(entries, columns = 3, danger) {
   }
   return rows
 }
+
+/** 从回复文本里挑出可点击的命令 */
+export function commandsInText(text, limit = 3) {
+  const out = []
+  for (const match of String(text ?? '').matchAll(/[#＃][\u4e00-\u9fa5A-Za-z][\u4e00-\u9fa5A-Za-z0-9_]{1,11}/g)) {
+    const cmd = match[0].replace(/^＃/, '#')
+    if (/\d{6,}/.test(cmd) || out.includes(cmd)) continue
+    out.push(cmd)
+    if (out.length >= limit) break
+  }
+  return out
+}

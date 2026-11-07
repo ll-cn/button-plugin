@@ -1,16 +1,21 @@
 import { getConfig } from '../model/config.js'
-import { rowsFromStrings, buildRows } from '../model/rows.js'
+import { rowsFromStrings, buildRows, commandsInText, labelOf } from '../model/rows.js'
 import { pickEntries } from '../model/help.js'
 
 const MARK = Symbol('btnDecorated')
 const PASSTHROUGH = new Set(['record', 'video', 'forward', 'node', 'button'])
+const MAX_ROWS = 5
+
+function isImage(item) {
+  return item?.type === 'image' || item?.type === 'flash' || Buffer.isBuffer(item)
+}
 
 /** 消息里是否含图片 */
 function hasImage(msg) {
   if (!msg) return false
   if (Buffer.isBuffer(msg)) return true
-  if (Array.isArray(msg)) return msg.some((seg) => seg?.type === 'image' || seg?.type === 'flash')
-  return msg?.type === 'image' || msg?.type === 'flash'
+  if (Array.isArray(msg)) return msg.some(isImage)
+  return isImage(msg)
 }
 
 /** 消息里是否已带按钮 */
@@ -22,6 +27,25 @@ function hasButton(msg) {
 function isPassthrough(item) {
   if (!item) return false
   return PASSTHROUGH.has(item?.type) || Boolean(item?.__forwardNodes ?? item?.__forwardParts)
+}
+
+/** 取消息里的文字部分 */
+function textOf(msg) {
+  if (typeof msg === 'string' || typeof msg === 'number') return String(msg)
+  if (Array.isArray(msg)) return msg.filter((seg) => seg?.type === 'text').map((seg) => seg.text ?? seg.data ?? '').join(' ')
+  if (msg?.type === 'text') return msg.text ?? msg.data ?? ''
+  return ''
+}
+
+/** 把图片拆出来，其余内容留给按钮消息 */
+function splitImage(msg) {
+  if (Array.isArray(msg)) {
+    const images = msg.filter(isImage)
+    if (!images.length) return null
+    return { images, rest: msg.filter((item) => !isImage(item)) }
+  }
+  if (isImage(msg)) return { images: [msg], rest: [] }
+  return null
 }
 
 /** 在消息末尾追加键盘 */
@@ -41,7 +65,7 @@ function attach(msg, rows) {
 }
 
 /** 命中面板时返回该面板的按钮行 */
-function planRows(cfg, text) {
+function panelRows(cfg, text) {
   for (const panel of cfg.panels) {
     if (!panel.re.test(text)) continue
     if (panel.source === 'miao') {
@@ -55,24 +79,53 @@ function planRows(cfg, text) {
   return null
 }
 
-/** 决定这条回复挂什么键盘 */
-function decorate(cfg, msg, fixed) {
-  if (hasButton(msg)) return msg
-  if (fixed) return attach(msg, fixed)
-  if (!cfg.default.enable || !cfg.default.rows.length) return msg
-  if (!hasImage(msg)) return msg
-  return attach(msg, rowsFromStrings(cfg.default.rows, cfg.danger))
+/** 把文本里出现的 #命令 追加成一行按钮 */
+function appendAuto(cfg, rows, text) {
+  if (!cfg.autoFromText || !text) return rows
+  const used = new Set((rows ?? []).flat().map((item) => item.data))
+  const commands = commandsInText(text, cfg.maxAuto).filter((cmd) => !used.has(cmd))
+  if (!commands.length) return rows
+  const auto = commands.map((cmd) => ({ title: labelOf(cmd), data: cmd }))
+  if (!rows || !rows.length) return buildRows(auto, auto.length, cfg.danger)
+  if (rows.length >= MAX_ROWS) return rows
+  return [...rows, buildRows(auto, auto.length, cfg.danger)[0]]
 }
 
-function patch(holder, key, fn) {
+/** 决定这条回复挂什么键盘，返回 null 表示不动 */
+function plan(cfg, msg, fixed) {
+  if (hasButton(msg)) return null
+  if (Array.isArray(msg) && msg.some(isPassthrough)) return null
+  if (isPassthrough(msg)) return null
+
+  let rows = fixed
+  if (!rows && cfg.default.enable && cfg.default.rows.length && hasImage(msg)) {
+    rows = rowsFromStrings(cfg.default.rows, cfg.danger)
+  }
+  rows = appendAuto(cfg, rows, textOf(msg))
+  if (!rows || !rows.length) return null
+  return { rows, split: cfg.imageMode === 'split' }
+}
+
+function patch(holder, key, fixed) {
   const orig = holder?.[key]
   if (typeof orig !== 'function' || orig[MARK]) return
-  const wrapped = function (msg, quote) {
-    let next = msg
+  const wrapped = async function (msg, quote) {
+    let planned = null
     try {
-      next = fn(msg)
+      planned = plan(getConfig(), msg, fixed)
     } catch {}
-    return orig.call(this, next, quote)
+    if (!planned) return orig.call(this, msg, quote)
+
+    const part = planned.split ? splitImage(msg) : null
+    if (!part) return orig.call(this, attach(msg, planned.rows), quote)
+
+    let first = null
+    try {
+      first = await orig.call(this, part.images.length === 1 ? part.images[0] : part.images, quote)
+    } catch {}
+    const tail = part.rest.length ? attach(part.rest, planned.rows) : segment.button(...planned.rows)
+    const second = await orig.call(this, tail, false)
+    return first ?? second
   }
   wrapped[MARK] = true
   try {
@@ -88,12 +141,10 @@ export function onMessage(e) {
   const text = String(e.msg || e.raw_message || '').trim()
   if (!text) return
   if (cfg.exclude.some((re) => re.test(text))) return
-  const fixed = planRows(cfg, text)
-  if (!fixed && !cfg.default.enable) return
-  const fn = (msg) => decorate(cfg, msg, fixed)
-  patch(e, 'reply', fn)
-  patch(e.group, 'sendMsg', fn)
-  patch(e.friend, 'sendMsg', fn)
+  const fixed = panelRows(cfg, text)
+  patch(e, 'reply', fixed)
+  patch(e.group, 'sendMsg', fixed)
+  patch(e.friend, 'sendMsg', fixed)
 }
 
 export function registerDecorator() {
