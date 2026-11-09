@@ -78,6 +78,20 @@ const PLUGIN_ROOTS = [
 const fileCache = new Map()
 const keywordCache = new Map()
 
+const SKIP_DIRS = new Set(['node_modules', 'data', '.git', 'dist', 'frontend', 'public'])
+const BAD_ASCII = new Set(['utils', 'imports', 'types', 'styles', 'source', 'main'])
+
+/** 过滤颜色值、import 别名这类假命令 */
+function acceptCommand(cmd) {
+  const body = cmd.slice(1)
+  if (!body) return false
+  if (/\d{6,}/.test(cmd)) return false
+  if (/^[0-9a-fA-F]{3,8}$/.test(body)) return false
+  if (/[\u4e00-\u9fa5]/.test(body)) return true
+  if (BAD_ASCII.has(body.toLowerCase())) return false
+  return /^[a-zA-Z][a-zA-Z0-9_]+$/.test(body)
+}
+
 /** 插件根目录候选（存在才算） */
 function pluginRoots() {
   return [...new Set(PLUGIN_ROOTS)].filter((dir) => {
@@ -89,24 +103,27 @@ function pluginRoots() {
   })
 }
 
-/** 列出目录下名字含 help 的脚本 */
-function helpFilesOf(dir) {
-  const out = []
-  for (const sub of ['', 'apps', 'config']) {
-    const target = sub ? path.join(dir, sub) : dir
-    let entries = []
-    try {
-      entries = fs.readdirSync(target, { withFileTypes: true })
-    } catch {
+/** 列出目录下名字含 help 的脚本（递归，跳过数据与依赖目录） */
+function helpFilesOf(dir, depth = 0, out = []) {
+  if (depth > 4) return out
+  let entries = []
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return out
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      helpFilesOf(full, depth + 1, out)
       continue
     }
-    for (const entry of entries) {
-      if (!entry.isFile() || !/\.(js|mjs|cjs|json|ya?ml)$/i.test(entry.name)) continue
-      if (!/help/i.test(entry.name)) continue
-      out.push(path.join(target, entry.name))
-    }
+    if (!/\.(js|mjs|cjs|json|ya?ml)$/i.test(entry.name)) continue
+    if (!/help/i.test(entry.name)) continue
+    out.push(full)
   }
-  return out
+  return out.sort((a, b) => Number(/default/i.test(a)) - Number(/default/i.test(b)))
 }
 
 /** 从帮助文件文本里提取 #命令 */
@@ -115,25 +132,27 @@ function commandsOf(file) {
   try {
     stat = fs.statSync(file)
   } catch {
-    return []
+    return { commands: [], text: '' }
   }
   const hit = fileCache.get(file)
-  if (hit && hit.mtime === stat.mtimeMs && hit.size === stat.size) return hit.commands
+  if (hit && hit.mtime === stat.mtimeMs && hit.size === stat.size) return hit
 
   let text = ''
   try {
+    if (stat.size > 512 * 1024) return { commands: [], text: '' }
     text = fs.readFileSync(file, 'utf8')
   } catch {
-    return []
+    return { commands: [], text: '' }
   }
   const commands = []
   for (const match of text.matchAll(/[#＃*＊][\u4e00-\u9fa5A-Za-z][\u4e00-\u9fa5A-Za-z0-9_]{1,11}/g)) {
     const cmd = match[0].replace(/^[＃＊]/, (c) => (c === '＃' ? '#' : '*'))
-    if (/\d{6,}/.test(cmd) || commands.includes(cmd)) continue
+    if (!acceptCommand(cmd) || commands.includes(cmd)) continue
     commands.push(cmd)
   }
-  fileCache.set(file, { mtime: stat.mtimeMs, size: stat.size, commands })
-  return commands
+  const entry = { mtime: stat.mtimeMs, size: stat.size, commands, text }
+  fileCache.set(file, entry)
+  return entry
 }
 
 /** 命令里的关键词：去掉前缀与「帮助」后缀 */
@@ -145,11 +164,10 @@ export function keywordOf(text) {
 }
 
 /** 按关键词找对应插件的帮助文件 */
-function findHelpFile(keyword) {
+function findHelpFile(keyword, command) {
   if (!keyword) return null
-  const roots = pluginRoots()
   let best = null
-  for (const root of roots) {
+  for (const root of pluginRoots()) {
     let dirs = []
     try {
       dirs = fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory())
@@ -157,19 +175,16 @@ function findHelpFile(keyword) {
       continue
     }
     for (const dir of dirs) {
-      if (dir.name === 'button-plugin' || dir.name === 'node_modules') continue
+      if (dir.name === 'button-plugin' || SKIP_DIRS.has(dir.name) || dir.name.startsWith('.')) continue
       const full = path.join(root, dir.name)
       for (const file of helpFilesOf(full)) {
-        const commands = commandsOf(file)
+        const { commands, text } = commandsOf(file)
         if (!commands.length) continue
         let score = 0
         if (dir.name.includes(keyword)) score += 5
-        try {
-          const text = fs.readFileSync(file, 'utf8')
-          score += text.split(keyword).length - 1
-        } catch {
-          continue
-        }
+        if (command && text.includes(command)) score += 20
+        score += commands.filter((cmd) => cmd.includes(keyword)).length * 3
+        score += Math.min(text.split(keyword).length - 1, 5)
         if (score > 0 && (!best || score > best.score)) best = { file, dir: dir.name, score, commands }
       }
     }
@@ -179,14 +194,18 @@ function findHelpFile(keyword) {
 
 /** 按命令关键词自动提取对应插件的帮助命令 */
 export function autoEntries(text, limit = 15) {
-  const keyword = keywordOf(text)
+  const command = String(text ?? '').trim()
+  const keyword = keywordOf(command)
   if (!keyword) return []
   const cached = keywordCache.get(keyword)
   if (cached && Date.now() - cached.at < 300000) return cached.entries.slice(0, limit)
 
-  const hit = findHelpFile(keyword)
+  const hit = findHelpFile(keyword, command)
   let commands = hit?.commands ?? []
-  if (hit?.dir === 'miao-plugin' && cache?.length) commands = cache.map((item) => item.command)
+  if (hit?.dir === 'miao-plugin') {
+    if (!/^(喵喵|miao)/i.test(keyword)) commands = []
+    else if (cache?.length) commands = cache.map((item) => item.command)
+  }
 
   const entries = commands.map((cmd) => ({ title: labelOf(cmd), data: cmd }))
   keywordCache.set(keyword, { at: Date.now(), entries })
@@ -204,7 +223,7 @@ export function pluginEntries(dirName, limit = 15) {
     }
     const commands = []
     for (const file of helpFilesOf(full)) {
-      for (const cmd of commandsOf(file)) if (!commands.includes(cmd)) commands.push(cmd)
+      for (const cmd of commandsOf(file).commands) if (!commands.includes(cmd)) commands.push(cmd)
     }
     if (commands.length) return commands.slice(0, limit).map((cmd) => ({ title: labelOf(cmd), data: cmd }))
   }

@@ -28,8 +28,10 @@ git clone https://github.com/ll-cn/button-plugin.git plugins/button-plugin
 `autoHelp` 默认开着：任何 `#xxx帮助` 的命令，插件会去 `plugins/` 下找帮助文件里提到「xxx」的那个插件，
 把里面的 `#命令` 抠出来做成按钮。不用改配置，也不用改那个插件。
 
-- 找的是插件目录下的 `apps/help.js`、`config/help*.js`、`help*.js`（名字里带 help 的脚本）
-- 用正则抠 `#命令`，所以不挑格式：`{ title: '#角色' }`、`{ cmd: '#绑定营地' }`、`alias: ['#王者ID']` 都能识别
+- 找的是插件目录里名字带 `help` 的脚本（会往下钻几层，`resources/help/help-cfg.js` 这种也能找到）
+- 用正则抠 `#命令`，所以不挑格式：`{ title: '#角色' }`、`{ cmd: '#绑定营地' }`、`alias: ['#王者ID']` 都能识别；
+  颜色值 `#ea0b0b`、`import` 别名 `#utils` 这类会被过滤掉
+- 打分看三样：文件里有没有完整命令、命令名里含关键词的条数、目录名/关键词出现次数。同一个关键词认不到就直接不挂按钮，不会硬塞别人的命令
 - 认错或想固定用哪个插件，就在 `panels` 里显式指定：
 
 ```yaml
