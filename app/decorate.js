@@ -1,6 +1,6 @@
 import { getConfig } from '../model/config.js'
 import { rowsFromStrings, buildRows, commandsInText, labelOf } from '../model/rows.js'
-import { pickEntries } from '../model/help.js'
+import { pickEntries, miaoCount } from '../model/help.js'
 import { resolveImageMode } from '../model/bridge.js'
 
 const MARK = Symbol('btnDecorated')
@@ -101,17 +101,19 @@ function attach(msg, rows) {
   return msg
 }
 
-/** 命中面板时返回该面板的按钮行 */
+/** 命中面板时返回该面板的按钮行；命中了但生成不出按钮返回 false */
 function panelRows(cfg, text) {
   for (const panel of cfg.panels) {
     if (!panel.re.test(text)) continue
     if (panel.source === 'miao') {
+      if (!miaoCount()) return false
       const entries = pickEntries(panel)
       if (entries.length) return buildRows(entries, panel.columns, cfg.danger)
       if (panel.rows.length) return rowsFromStrings(panel.rows, cfg.danger)
-      continue
+      return false
     }
     if (panel.rows.length) return rowsFromStrings(panel.rows, cfg.danger)
+    return false
   }
   return null
 }
@@ -129,13 +131,14 @@ function appendAuto(cfg, rows, text) {
 }
 
 /** 决定这条回复挂什么键盘，返回 null 表示不动 */
-function plan(cfg, msg, fixed) {
+function plan(cfg, msg, fixed, noDefault) {
+  if (fixed === false) return null
   if (hasButton(msg)) return null
   if (Array.isArray(msg) && msg.some(isPassthrough)) return null
   if (isPassthrough(msg)) return null
 
   let rows = fixed
-  if (!rows && cfg.default.enable && cfg.default.rows.length && hasImage(msg)) {
+  if (!rows && !noDefault && cfg.default.enable && cfg.default.rows.length && hasImage(msg)) {
     rows = rowsFromStrings(cfg.default.rows, cfg.danger)
   }
   rows = appendAuto(cfg, rows, textOf(msg))
@@ -143,7 +146,7 @@ function plan(cfg, msg, fixed) {
   return { rows, split: resolveImageMode(cfg.imageMode) === 'split' }
 }
 
-function patch(holder, key, fixed) {
+function patch(holder, key, fixed, noDefault) {
   const orig = holder?.[key]
   if (typeof orig !== 'function' || orig[MARK]) return
   let splitUsed = 0
@@ -156,7 +159,7 @@ function patch(holder, key, fixed) {
 
     let planned = null
     try {
-      planned = plan(cfg, next, fixed)
+      planned = plan(cfg, next, fixed, noDefault)
     } catch {}
     if (!planned) return orig.call(this, next, quote)
 
@@ -189,9 +192,10 @@ export function onMessage(e) {
   if (!text) return
   if (cfg.exclude.some((re) => re.test(text))) return
   const fixed = panelRows(cfg, text)
-  patch(e, 'reply', fixed)
-  patch(e.group, 'sendMsg', fixed)
-  patch(e.friend, 'sendMsg', fixed)
+  const noDefault = Boolean(cfg.skipDefault?.test(text))
+  patch(e, 'reply', fixed, noDefault)
+  patch(e.group, 'sendMsg', fixed, noDefault)
+  patch(e.friend, 'sendMsg', fixed, noDefault)
 }
 
 export function registerDecorator() {

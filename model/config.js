@@ -26,6 +26,9 @@ maxAuto: 3
 # 危险命令用指令按钮：点了只填入输入框，需自己发送
 danger: "^#?(删除|解绑|清除|重置)"
 
+# 这些命令的回复不挂默认键盘（各插件自己画的帮助图，挂了反而对不上）
+skipDefault: "^[#＃]?(.*帮助|help|菜单|功能|版本)$"
+
 # 其它插件写好的指令按钮改成回调，点一下直接执行
 upgradeButtons: true
 # 这些命令保留指令按钮，需要用户自己补参数
@@ -104,6 +107,7 @@ function normalize(raw) {
     autoFromText: raw?.autoFromText !== false,
     maxAuto: Math.min(Math.max(Number(raw?.maxAuto) || 3, 1), 5),
     exclude: (Array.isArray(raw?.exclude) ? raw.exclude : []).map(toRe).filter(Boolean),
+    skipDefault: toRe(raw?.skipDefault) ?? toRe('^[#＃]?(.*帮助|help|菜单|功能|版本)$'),
     upgradeButtons: raw?.upgradeButtons !== false,
     keepInput: toRe(raw?.keepInput) ?? toRe('^[#*]?(删除|解绑|绑定|登录|扫码|切换|设置|导入|添加|修改|清除|重置)'),
     danger: toRe(raw?.danger) ?? toRe('^#?(删除|解绑|清除|重置)'),

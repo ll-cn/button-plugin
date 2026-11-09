@@ -1,7 +1,7 @@
 import plugin from '../../../lib/plugins/plugin.js'
 import { getConfig, CONFIG_FILE } from '../model/config.js'
 import { rowsFromStrings, buildRows } from '../model/rows.js'
-import { pickEntries, miaoCount, loadMiaoCommands } from '../model/help.js'
+import { pickEntries, miaoCount, miaoSource, loadMiaoCommands } from '../model/help.js'
 import { PLUGIN_NAME, VERSION, versionLine } from '../model/version.js'
 import { updatePlugin, replyChangelog } from '../model/update.js'
 import { bridgePatched, resolveImageMode } from '../model/bridge.js'
@@ -49,7 +49,8 @@ export default class ButtonPanel extends plugin {
       `按钮升级：${cfg.upgradeButtons ? '开' : '关'}`,,
       `专门面板：${cfg.panels.length} 个`,
       `面板匹配：${match}`,
-      `miao 帮助条目：${miaoCount()}`,
+      `miao 帮助条目：${miaoCount()}${miaoSource() ? '' : '（没找到 help.js）'}`,
+      `帮助来源：${miaoSource() || '无'}`,
       `配置：${CONFIG_FILE}`,
       '',
       versionLine()
