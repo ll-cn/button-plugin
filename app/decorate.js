@@ -1,6 +1,6 @@
 import { getConfig } from '../model/config.js'
 import { rowsFromStrings, buildRows, commandsInText, labelOf } from '../model/rows.js'
-import { pickEntries, miaoCount } from '../model/help.js'
+import { pickEntries, miaoCount, autoEntries, pluginEntries } from '../model/help.js'
 import { resolveImageMode } from '../model/bridge.js'
 
 const MARK = Symbol('btnDecorated')
@@ -112,8 +112,18 @@ function panelRows(cfg, text) {
       if (panel.rows.length) return rowsFromStrings(panel.rows, cfg.danger)
       return false
     }
+    if (panel.source === 'plugin') {
+      const entries = pluginEntries(panel.plugin, panel.limit)
+      if (entries.length) return buildRows(entries, panel.columns, cfg.danger)
+      return false
+    }
     if (panel.rows.length) return rowsFromStrings(panel.rows, cfg.danger)
     return false
+  }
+
+  if (cfg.autoHelp) {
+    const entries = autoEntries(text, cfg.autoLimit)
+    if (entries.length) return buildRows(entries, cfg.autoColumns, cfg.danger)
   }
   return null
 }

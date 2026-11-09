@@ -18,9 +18,29 @@ git clone https://github.com/ll-cn/button-plugin.git plugins/button-plugin
 | --- | --- |
 | `#按钮面板` / `#按钮帮助` | 打开入口面板（按钮由 miao 帮助自动生成） |
 | `#按钮状态` | 查看开关、面板数量、miao 帮助条目数、配置路径 |
+| `#按钮提取 王者帮助` | 试算能提取出哪些按钮（参数也可以写插件目录名） |
 | `#按钮插件更新` | 从 GitHub 拉取新版本 |
 | `#按钮插件强制更新` | 丢弃本地改动，对齐远程分支 |
 | `#按钮插件更新日志` | 查看最近的提交记录 |
+
+## 其它插件的帮助按钮
+
+`autoHelp` 默认开着：任何 `#xxx帮助` 的命令，插件会去 `plugins/` 下找帮助文件里提到「xxx」的那个插件，
+把里面的 `#命令` 抠出来做成按钮。不用改配置，也不用改那个插件。
+
+- 找的是插件目录下的 `apps/help.js`、`config/help*.js`、`help*.js`（名字里带 help 的脚本）
+- 用正则抠 `#命令`，所以不挑格式：`{ title: '#角色' }`、`{ cmd: '#绑定营地' }`、`alias: ['#王者ID']` 都能识别
+- 认错或想固定用哪个插件，就在 `panels` 里显式指定：
+
+```yaml
+- match: "^#?王者帮助$"
+  source: plugin
+  plugin: GloryOfKings-Plugin   # plugins/ 下的目录名
+  limit: 15
+  columns: 3
+```
+
+`#按钮提取 王者帮助` 可以先看提取结果，再决定要不要固定。
 
 ## 配置
 
@@ -34,6 +54,9 @@ imageMode: auto        # auto 按桥补丁自动选；也可写死 split / merge
 autoFromText: true     # 回复文字里出现 #命令 时自动把它加成按钮
 maxAuto: 3             # 自动按钮最多几个
 skipDefault: "^[#＃]?(.*帮助|help|菜单|功能|版本)$"   # 这些命令不挂默认键盘
+autoHelp: true         # 任何「#xxx帮助」自动去对应插件里提取命令
+autoLimit: 15          # 自动帮助最多几个按钮
+autoColumns: 3         # 自动帮助每行几个
 danger: "^#?(删除|解绑|清除|重置)"   # 命中的按钮变成指令按钮（点了只填入输入框）
 upgradeButtons: true   # 其它插件发的指令按钮自动改成回调，点一下直接执行
 keepInput: "^[#*]?(删除|解绑|绑定|登录|扫码|切换|设置|导入|添加|修改|清除|重置)"  # 这些保留指令按钮
