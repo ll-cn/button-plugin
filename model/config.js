@@ -31,6 +31,8 @@ skipDefault: "^[#＃]?(.*帮助|help|菜单|功能|版本)$"
 
 # 任何「#xxx帮助」都去对应插件目录找 help 文件，自动提取命令做按钮
 autoHelp: true
+# 只有命中这条的命令才会去提取
+autoMatch: "(帮助|help|菜单|功能)$"
 autoLimit: 15
 autoColumns: 3
 
@@ -83,6 +85,14 @@ function toRe(value) {
   }
 }
 
+function toReWithFlag(value, fallback, flags = 'i') {
+  try {
+    return new RegExp(String(value || fallback), flags)
+  } catch {
+    return new RegExp(fallback, flags)
+  }
+}
+
 function toRows(rows) {
   if (!Array.isArray(rows)) return []
   return rows
@@ -115,6 +125,7 @@ function normalize(raw) {
     exclude: (Array.isArray(raw?.exclude) ? raw.exclude : []).map(toRe).filter(Boolean),
     skipDefault: toRe(raw?.skipDefault) ?? toRe('^[#＃]?(.*帮助|help|菜单|功能|版本)$'),
     autoHelp: raw?.autoHelp !== false,
+    autoMatch: toReWithFlag(raw?.autoMatch, '(帮助|help|菜单|功能)$'),
     autoLimit: Math.min(Math.max(Number(raw?.autoLimit) || 15, 1), 25),
     autoColumns: Math.min(Math.max(Number(raw?.autoColumns) || 3, 1), 5),
     upgradeButtons: raw?.upgradeButtons !== false,

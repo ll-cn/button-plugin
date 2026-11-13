@@ -121,7 +121,7 @@ function panelRows(cfg, text) {
     return false
   }
 
-  if (cfg.autoHelp) {
+  if (cfg.autoHelp && cfg.autoMatch.test(text)) {
     const entries = autoEntries(text, cfg.autoLimit)
     if (entries.length) return buildRows(entries, cfg.autoColumns, cfg.danger)
   }

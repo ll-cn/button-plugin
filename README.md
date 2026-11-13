@@ -25,8 +25,9 @@ git clone https://github.com/ll-cn/button-plugin.git plugins/button-plugin
 
 ## 其它插件的帮助按钮
 
-`autoHelp` 默认开着：任何 `#xxx帮助` 的命令，插件会去 `plugins/` 下找帮助文件里提到「xxx」的那个插件，
-把里面的 `#命令` 抠出来做成按钮。不用改配置，也不用改那个插件。
+`autoHelp` 默认开着：**只有以 `帮助` / `help` / `菜单` / `功能` 结尾的命令**才会触发（`autoMatch` 控制），
+插件会去 `plugins/` 下找帮助文件里提到关键词的那个插件，把里面的 `#命令` 抠出来做成按钮。
+不用改配置，也不用改那个插件。普通命令（`#伊伊设置`、`#点歌`）不会因为名字里带关键词就被塞一套按钮。
 
 - 找的是插件目录里名字带 `help` 的脚本（会往下钻几层，`resources/help/help-cfg.js` 这种也能找到）
 - 用正则抠 `#命令`，所以不挑格式：`{ title: '#角色' }`、`{ cmd: '#绑定营地' }`、`alias: ['#王者ID']` 都能识别；
@@ -57,6 +58,7 @@ autoFromText: true     # 回复文字里出现 #命令 时自动把它加成按�
 maxAuto: 3             # 自动按钮最多几个
 skipDefault: "^[#＃]?(.*帮助|help|菜单|功能|版本)$"   # 这些命令不挂默认键盘
 autoHelp: true         # 任何「#xxx帮助」自动去对应插件里提取命令
+autoMatch: "(帮助|help|菜单|功能)$"   # 只有这类命令才会提取
 autoLimit: 15          # 自动帮助最多几个按钮
 autoColumns: 3         # 自动帮助每行几个
 danger: "^#?(删除|解绑|清除|重置)"   # 命中的按钮变成指令按钮（点了只填入输入框）
