@@ -180,12 +180,15 @@ function findHelpFile(keyword, command) {
       for (const file of helpFilesOf(full)) {
         const { commands, text } = commandsOf(file)
         if (!commands.length) continue
-        let score = 0
-        if (dir.name.includes(keyword)) score += 5
-        if (command && text.includes(command)) score += 20
-        score += commands.filter((cmd) => cmd.includes(keyword)).length * 3
-        score += Math.min(text.split(keyword).length - 1, 5)
-        if (score > 0 && (!best || score > best.score)) best = { file, dir: dir.name, score, commands }
+        const related = commands.filter((cmd) => cmd.includes(keyword)).length * 3
+        const strong =
+          (dir.name.includes(keyword) ? 5 : 0) +
+          (command && text.includes(command) ? 20 : 0) +
+          related +
+          (text.includes(`${keyword}帮助`) || text.includes(`${keyword}菜单`) ? 5 : 0)
+        if (!strong) continue
+        const score = strong + Math.min(text.split(keyword).length - 1, 5)
+        if (!best || score > best.score) best = { file, dir: dir.name, score, commands }
       }
     }
   }
@@ -206,6 +209,10 @@ export function autoEntries(text, limit = 15) {
     if (!/^(喵喵|miao)/i.test(keyword)) commands = []
     else if (cache?.length) commands = cache.map((item) => item.command)
   }
+
+  try {
+    Bot.makeLog('debug', `[按钮插件] 自动帮助 ${command} → ${hit ? hit.dir : '未匹配'}（${commands.length} 条）`, false)
+  } catch {}
 
   const entries = commands.map((cmd) => ({ title: labelOf(cmd), data: cmd }))
   keywordCache.set(keyword, { at: Date.now(), entries })

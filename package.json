@@ -1,6 +1,6 @@
 {
   "name": "button-plugin",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "type": "module",
   "main": "index.js",
   "description": "给云崽已有命令的回复挂按钮，点一下直接执行",
